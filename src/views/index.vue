@@ -325,7 +325,7 @@ export default {
     return {
       autoFolders: true,
       isLoggedInUser: false,
-      pluginsPath : '/home/software/AllProjects/FlowzBuilder/src/assets/plugins',
+      pluginsPath : '/home/software/workspace/faizan/FlowzBuilder/src/assets/plugins',
       directoryTree: [],
       currentFile : null,
       defaultProps: {
