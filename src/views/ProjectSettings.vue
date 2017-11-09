@@ -612,29 +612,6 @@ export default {
                 console.log(res)
                 var rawContent = await axios.get(config.baseURL + '/flows-dir-listing/0?path=' + this.$store.state.fileUrl.replace(/\\/g, "\/") + '/Pages/' + nameF + '.html');
 
-                // newContent = newContent.data;
-                // if (Layout == 'Blank') {
-                //   if (newContent.match('---')) {
-                //     let substr = newContent.substr(newContent.search('---'), newContent.search('<'))
-                //     console.log("substr:" + substr)
-                //     newContent = newContent.replace(substr, '')
-                //   } else {
-                //     newContent = newContent
-                //   }
-
-                // } else {
-                //   let tempValueLayout = '---\nlayout: ' + Layout + '.layout\n---\n';
-                //   if (newContent.match('---')) {
-                //     let substr = newContent.substr(newContent.search('---'), newContent.search('<'))
-                //     newContent = newContent.replace(substr, tempValueLayout)
-                //   } else {
-                //     newContent = tempValueLayout + newContent
-                //   }
-
-                // }
-
-                // let rawContent = this.$store.state.content;
-
                   let newContent = "<html>\n<head>\n"+
                   "<meta content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0' name='viewport' />\n"+
                   "<link href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css' rel='stylesheet' />\n"+
@@ -805,57 +782,6 @@ export default {
       window.open('http://localhost' + folderUrl.replace('var/www/html/', '') + '/public/');
 
     },
-
-    // Code before Full Publish of project
-    // publishMetalsmith(){
-    //   var partials = '';
-    //   if (this.form.Header != '') {
-    //       var partialHeader = "Handlebars.registerPartial('Header', fs.readFileSync('" + this.$store.state.fileUrl + "/Headers/" + this.form.Header + ".html').toString());\n";
-    //       partials = partials + partialHeader;
-    //   }
-    //   if (this.form.Footer != '') {
-    //       var partialFooter = "Handlebars.registerPartial('Footer', fs.readFileSync('" + this.$store.state.fileUrl + "/Footers/" + this.form.Footer + ".html').toString());\n"
-    //       partials = partials + partialFooter;
-    //   }
-
-    //   var metalsmithJSON = "var Metalsmith=require('metalsmith');\nvar markdown=require('metalsmith-markdown');\nvar layouts=require('metalsmith-layouts');\nvar permalinks=require('metalsmith-permalinks');\nvar fs=require('fs');\nvar Handlebars=require('handlebars');\n" + partials + " Metalsmith(__dirname)\n.metadata({title:'" + this.form.seoTitle + "',description:'" + this.form.seoDesc + "'})\n.source('" + this.$store.state.fileUrl + "/Pages')\n.destination('" + this.$store.state.fileUrl + "/MetalsmithOutput')\n.clean(false)\n.use(markdown())\n.use(permalinks())\n.use(layouts({engine:'handlebars',directory:'" + this.$store.state.fileUrl + "/Layouts'}))\n.build(function(err,files)\n{if(err){console.log(err)}});"
-
-    //   // console.log(this.$store.state.fileUrl);
-    //   axios.post('http://localhost:3030/flows-dir-listing', {
-    //       filename: this.$store.state.fileUrl + '/assets/metalsmith.js',
-    //       text: (metalsmithJSON),
-    //       type: 'file'
-    //   }).then((response) => {
-    //       // console.log('Axios call 1');
-    //       console.log('successfully created metalsmith file :', (response.data))
-    //       this.$message({
-    //           showClose: true,
-    //           message: 'MetalSmith Config Saved!',
-    //           type: 'success'
-    //       });
-
-    //       axios.get('http://localhost:3030/metalsmith?path=' + this.$store.state.fileUrl, {
-    //       }).then((response) => {
-    //           // console.log('Axios call 2');
-    //           console.log('successfully  :' + (response))
-    //       })
-    //       .catch((err) => {
-    //           this.$message({
-    //               showClose: true,
-    //               message: 'Cannot get Metalsmith file! Some error occured, try again.',
-    //               type: 'error'
-    //           });
-    //       })
-    //   })
-    //   .catch((e) => {
-    //       console.log('Mrror while creating MetalSmith JSON file' + e)
-    //       this.$message({
-    //           showClose: true,
-    //           message: 'Cannot save file! Some error occured, try again.',
-    //           type: 'error'
-    //       });
-    //   })
-    // },
 
     handleRemove(file, fileList) {
       console.log(file, fileList);
