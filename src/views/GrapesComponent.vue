@@ -1,4 +1,4 @@
-<template id="GrapesComponent">
+    <template id="GrapesComponent">
   <div class="GrapesComponent">
     <div id="gjs" style="width: 100%; height: 89vh !important;"></div>
   </div>

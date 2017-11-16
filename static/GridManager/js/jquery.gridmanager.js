@@ -1,4 +1,4 @@
-/*! gridmanager - v0.3.1 - 2014-07-27
+z/*! gridmanager - v0.3.1 - 2014-07-27
 * http://neokoenig.github.io/jQuery-gridmanager/
 * Copyright (c) 2014 Tom King; Licensed MIT */
 (function($  ){

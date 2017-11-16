@@ -400,6 +400,7 @@ export default {
       form: {
         Header: '',
         Footer: '',
+        url:'',
         Layout: '',
         headers: [{ value: 'NOH', label: 'No Header' }],
         footers: [{ value: 'NOF', label: 'No Footer' }],
@@ -757,270 +758,274 @@ export default {
 
     // Generate Preview of Page
     async generatePreview() {
+        // Save File first
+        this.saveFile();
+        console.log("done with saveFile")
+        //get header, footer from pagesetting from config.json and then set the value in js file to call the api.
 
-      // Save File first
-      this.saveFile();
+        let nameF = this.$store.state.fileUrl.substring(this.$store.state.fileUrl.indexOf('Pages/') + 6, this.$store.state.fileUrl.indexOf('.html'));
 
-      //get header, footer from pagesetting from config.json and then set the value in js file to call the api.
+        let configFileUrl = this.$store.state.fileUrl.replace(/\\/g, "\/");
+        let urlparts = configFileUrl.split("/");
+        let fileNameOrginal = urlparts[urlparts.length - 1];
+        let fileName = '/' + urlparts[urlparts.length - 2] + '/' + urlparts[urlparts.length - 1];
+        var folderUrl = configFileUrl.replace(fileName, '');
+        let responseConfig = await axios.get(config.baseURL + '/flows-dir-listing/0?path=' + folderUrl + '/assets/config.json');
+        let rawSettings = JSON.parse(responseConfig.data);
 
-      let nameF = this.$store.state.fileUrl.substring(this.$store.state.fileUrl.indexOf('Pages/') + 6, this.$store.state.fileUrl.indexOf('.html'));
-
-      let configFileUrl = this.$store.state.fileUrl.replace(/\\/g, "\/");
-      let urlparts = configFileUrl.split("/");
-      let fileNameOrginal = urlparts[urlparts.length - 1];
-      let fileName = '/' + urlparts[urlparts.length - 2] + '/' + urlparts[urlparts.length - 1];
-      var folderUrl = configFileUrl.replace(fileName, '');
-      let responseConfig = await axios.get(config.baseURL + '/flows-dir-listing/0?path=' + folderUrl + '/assets/config.json');
-      let rawSettings = JSON.parse(responseConfig.data);
-
-      for (let i = 0; i < rawSettings[1].pageSettings.length; i++) {
-        if (rawSettings[1].pageSettings[i].PageName == (nameF + '.html')) {
-          this.form.Layout = rawSettings[1].pageSettings[i].PageLayout
-          this.form.partials = rawSettings[1].pageSettings[i].partials
+        for (let i = 0; i < rawSettings[1].pageSettings.length; i++) {
+            if (rawSettings[1].pageSettings[i].PageName == (nameF + '.html')) {
+                this.form.Layout = rawSettings[1].pageSettings[i].PageLayout
+                this.form.partials = rawSettings[1].pageSettings[i].partials
+                this.form.url = rawSettings[1].pageSettings[i].PageURL
+            }
         }
-      }
+        console.log("this.form.url:", this.form.url)
+        let responseMetal = await axios.get(config.baseURL + '/flows-dir-listing/0?path=' + folderUrl + '/assets/metalsmith.js');
 
-      let responseMetal = await axios.get(config.baseURL + '/flows-dir-listing/0?path=' + folderUrl + '/assets/metalsmith.js');
-      var index = responseMetal.data.search('.source')
+        var index = responseMetal.data.search('.source')
 
-      responseMetal.data = responseMetal.data.substr(0, index + 9) + folderUrl + '/Preview' + responseMetal.data.substr(index + 9)
+        responseMetal.data = responseMetal.data.substr(0, index + 9) + folderUrl + '/Preview' + responseMetal.data.substr(index + 9)
+        if (this.form.url != '') {
+            var indexPerma = responseMetal.data.search('.clean');
+            var permalinks = "\n.use(permalinks({ pattern: ':date' }))"
+            responseMetal.data = responseMetal.data.substr(0, indexPerma + 13) + permalinks + responseMetal.data.substr(indexPerma + 13)
+        }
+        var indexPartial = responseMetal.data.search("('handlebars')");
 
-      var indexPartial = responseMetal.data.search("('handlebars')");
+        var partials = '';
+        for (var i = 0; i < this.form.partials.length; i++) {
+            let key = Object.keys(this.form.partials[i])[0];
+            let value = this.form.partials[i]
+            let key2 = key;
+            key = key.trim();
 
-      var partials = '';
-      for (var i = 0; i < this.form.partials.length; i++) {
-        let key = Object.keys(this.form.partials[i])[0];
-        let value = this.form.partials[i]
-        let key2 = key;
-        key = key.trim();
+            if (value[key2].match('html')) {
+                key = key.split('.')[0]
+                var temp = "Handlebars.registerPartial('" + key + "', fs.readFileSync('" + folderUrl + "/" + key + "/" + value[key2] + "').toString())\n"
+            } else if (value[key2].match('hbs')) {
+                key = key.split('.')[0]
+                var temp = "Handlebars.registerPartial('" + key + "', fs.readFileSync('" + folderUrl + "/" + key + "/" + value[key2] + "').toString())\n"
+            } else {
+                var temp = "Handlebars.registerPartial('" + key + "', fs.readFileSync('" + folderUrl + "/" + key + "/" + value[key2] + ".html').toString())\n"
+            }
 
-        if (value[key2].match('html')) {
-          key = key.split('.')[0]
-          var temp = "Handlebars.registerPartial('" + key + "', fs.readFileSync('" + folderUrl + "/" + key + "/" + value[key2] + "').toString())\n"
-        } else if (value[key2].match('hbs')) {
-          key = key.split('.')[0]
-          var temp = "Handlebars.registerPartial('" + key + "', fs.readFileSync('" + folderUrl + "/" + key + "/" + value[key2] + "').toString())\n"
-        } else {
-          var temp = "Handlebars.registerPartial('" + key + "', fs.readFileSync('" + folderUrl + "/" + key + "/" + value[key2] + ".html').toString())\n"
+            partials = partials + temp;
+
         }
 
-        partials = partials + temp;
+        responseMetal.data = responseMetal.data.substr(0, indexPartial + 15) + partials + responseMetal.data.substr(indexPartial + 15);
+        // console.log("final metalsmith:",responseMetal.data)
+        let mainMetal = folderUrl + '/assets/metalsmith.js'
 
-      }
+        axios.post(config.baseURL + '/flows-dir-listing', {
+                filename: mainMetal,
+                text: responseMetal.data,
+                type: 'file'
+            }).then(async (response) => {
+                this.$message({
+                    showClose: true,
+                    message: 'Config Saved!',
+                    type: 'success'
+                });
 
-      responseMetal.data = responseMetal.data.substr(0, indexPartial + 15) + partials + responseMetal.data.substr(indexPartial + 15);
+                // Create temporary preview folder
+                let newFolderName = folderUrl + '/Preview';
+                return axios.post(config.baseURL + '/flows-dir-listing', {
+                        foldername: newFolderName,
+                        type: 'folder'
+                    })
+                    .then(async (res) => {
+                        console.log(res)
+                        // Create preview file
 
-      let mainMetal = folderUrl + '/assets/metalsmith.js'
 
-      axios.post(config.baseURL + '/flows-dir-listing', {
-          filename: mainMetal,
-          text: responseMetal.data,
-          type: 'file'
-        }).then((response) => {
-          this.$message({
-            showClose: true,
-            message: 'Config Saved!',
-            type: 'success'
-          });
+                        let layoutdata = await axios.get(config.baseURL + '/flows-dir-listing/0?path=' + folderUrl + '/Layout/' + this.form.Layout + '.layout');
+                        // console.log("layoutdata.data:",layoutdata.data)
+                        let newContent = "<html>\n<head>\n" +
+                            "<meta content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0' name='viewport' />\n" +
+                            "<link href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css' rel='stylesheet' />\n" +
+                            "<link rel='stylesheet' href='https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css'/>\n" +
+                            "<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/themes/base/theme.min.css' />\n" +
+                            "<script src='https://code.jquery.com/jquery-3.2.1.js'><\/script>\n" +
+                            "<script src='https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.3/socket.io.js'><\/script>\n" +
+                            "<script src='https://cdn.rawgit.com/feathersjs/feathers-client/v1.1.0/dist/feathers.js'><\/script>\n" +
+                            "<script src='https://code.jquery.com/ui/1.12.1/jquery-ui.js' crossorigin='anonymous'><\/script>\n" +
+                            "<script src='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js' crossorigin='anonymous'><\/script>\n" +
+                            '<script src="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"><\/script>\n' +
+                            '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.5.2/animate.min.css">\n' +
+                            "<link rel='stylesheet' href='./../main-files/main.css'/>\n</head><body>\n" +
+                            layoutdata.data +
+                            '<script src="./../assets/client-plugins/global-variables-plugin.js"><\/script>\n' +
+                            '<script src="./../assets/client-plugins/client-navbar-plugin.js"><\/script>\n' +
+                            '<script src="./../assets/client-plugins/client-product-listing-plugin.js"><\/script>\n' +
+                            '<script src="./../assets/client-plugins/client-product-detail-plugin.js"><\/script>\n' +
+                            '<script src="./../assets/client-plugins/client-slider-plugin.js"><\/script>\n' +
+                            '<script src="./../assets/client-plugins/client-popular-product-slider-plugin.js"><\/script>\n' +
+                            '<script src="./../assets/client-plugins/client-pagination-plugin.js"><\/script>\n' +
+                            '<script src="./../assets/client-plugins/client-my-cart-plugin.js"><\/script>\n' +
+                            '<script src="./../assets/client-plugins/image-gradient-animation.js"><\/script>\n' +
+                            '<script src="./../assets/client-plugins/progress-bars.js"><\/script>\n' +
+                            // '<script src="https://s3-us-west-2.amazonaws.com/airflowbucket1/flowz-builder/js/client1.js"><\/script>\n'+
+                            '<script src="./../main-files/main.js"><\/script>\n' +
+                            '</body>\n</html>';
+                        // console.log("path for layout:",folderUrl + '/Layout/' + this.form.Layout+'.layout')
+                        // console.log("layout file:",newContent)
+                        axios.post(config.baseURL + '/flows-dir-listing', {
+                                filename: folderUrl + '/Layout/' + this.form.Layout + '.layout',
+                                text: newContent,
+                                type: 'file'
+                            })
+                            .then(async (res) => {
+                                console.log("successfully layout file edited:")
+                                let rawContent = this.$store.state.content;
+                                if (this.form.Layout == 'Blank') {
+                                    let substr = rawContent.substr(rawContent.search('---'), rawContent.search('<'))
+                                    if (rawContent.match('---')) {
+                                        if (this.form.url != '') {
+                                            rawContent = rawContent.replace(substr, '---\ndate: ' + this.form.url + '\n---')
+                                        } else {
+                                            // let substr = newContent.substr(newContent.search('---'), newContent.search('<'))
+                                            rawContent = rawContent.replace(substr, '')
+                                        }
+                                    } else {
+                                        if (this.form.url != '') {
 
-          // Create temporary preview folder
-          let newFolderName = folderUrl + '/Preview';
-          return axios.post(config.baseURL + '/flows-dir-listing', {
-              foldername: newFolderName,
-              type: 'folder'
-            })
-            .then((res) => {
-              console.log(res)
-                // Create preview file
+                                            console.log("here")
+                                            rawContent = "---\ndate: " + this.form.url + "\n---" + rawContent
+                                        } else {
+                                            // let substr = newContent.substr(newContent.search('---'), newContent.search('<'))
+                                            rawContent = rawContent
+                                        }
+                                    }
+                                } else {
+                                    if (this.form.url != '') {
+                                        let tempValueLayout = '---\ndate: ' + this.form.url + '\nlayout: ' + this.form.Layout + '.layout\n---\n';
 
-              let rawContent = this.$store.state.content;
+                                        if (rawContent.match('---')) {
+                                            let substr = rawContent.substr(rawContent.search('---'), rawContent.search('<'))
+                                            rawContent = rawContent.replace(substr, tempValueLayout)
+                                        } else {
+                                            rawContent = tempValueLayout + rawContent
+                                        }
 
-              let newContent = "<html>\n<head>\n" +
-                "<meta content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0' name='viewport' />\n" +
-                "<link href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css' rel='stylesheet' />\n" +
-                "<link rel='stylesheet' href='https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css'/>\n" +
-                "<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/themes/base/theme.min.css' />\n" +
-                "<script src='https://code.jquery.com/jquery-3.2.1.js'><\/script>\n" +
-                "<script src='https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.3/socket.io.js'><\/script>\n" +
-                "<script src='https://cdn.rawgit.com/feathersjs/feathers-client/v1.1.0/dist/feathers.js'><\/script>\n" +
-                "<script src='https://code.jquery.com/ui/1.12.1/jquery-ui.js' crossorigin='anonymous'><\/script>\n" +
-                "<script src='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js' crossorigin='anonymous'><\/script>\n" +
-                '<script src="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"><\/script>\n' +
-                '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.5.2/animate.min.css">\n' +
-                "<link rel='stylesheet' href='./../main-files/main.css'/>\n" +
-                rawContent +
-                '<script src="./../assets/client-plugins/global-variables-plugin.js"><\/script>\n' +
-                '<script src="./../assets/client-plugins/client-navbar-plugin.js"><\/script>\n' +
-                '<script src="./../assets/client-plugins/client-product-listing-plugin.js"><\/script>\n' +
-                '<script src="./../assets/client-plugins/client-product-detail-plugin.js"><\/script>\n' +
-                '<script src="./../assets/client-plugins/client-slider-plugin.js"><\/script>\n' +
-                '<script src="./../assets/client-plugins/client-popular-product-slider-plugin.js"><\/script>\n' +
-                '<script src="./../assets/client-plugins/client-pagination-plugin.js"><\/script>\n' +
-                '<script src="./../assets/client-plugins/client-my-cart-plugin.js"><\/script>\n' +
-                '<script src="./../assets/client-plugins/image-gradient-animation.js"><\/script>\n' +
-                '<script src="./../assets/client-plugins/progress-bars.js"><\/script>\n' +
-                // '<script src="https://s3-us-west-2.amazonaws.com/airflowbucket1/flowz-builder/js/client1.js"><\/script>\n'+
-                '<script src="./../main-files/main.js"><\/script>\n' +
-                '</body>\n</html>';
+                                    } else {
+                                        let tempValueLayout = '---\nlayout: ' + this.form.Layout + '.layout\n---\n';
 
-              if (this.form.Layout == 'Blank') {
-                if (newContent.match('---')) {
-                  let substr = newContent.substr(newContent.search('---'), newContent.search('<'))
-                  newContent = newContent.replace(substr, '')
-                } else {
-                  newContent = "<html>\n<head>\n" +
-                    "<meta content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0' name='viewport' />\n" +
-                    "<link href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css' rel='stylesheet' />\n" +
-                    "<link rel='stylesheet' href='https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css'/>\n" +
-                    "<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/themes/base/theme.min.css' />\n" +
-                    "<script src='https://code.jquery.com/jquery-3.2.1.js'><\/script>\n" +
-                    "<script src='https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.3/socket.io.js'><\/script>\n" +
-                    "<script src='https://cdn.rawgit.com/feathersjs/feathers-client/v1.1.0/dist/feathers.js'><\/script>\n" +
-                    "<script src='https://code.jquery.com/ui/1.12.1/jquery-ui.js' crossorigin='anonymous'><\/script>\n" +
-                    "<script src='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js' crossorigin='anonymous'><\/script>\n" +
-                    '<script src="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"><\/script>\n' +
-                    '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.5.2/animate.min.css">\n' +
-                    "<link rel='stylesheet' href='./../main-files/main.css'/>\n" +
-                    rawContent +
-                    '<script src="./../assets/client-plugins/global-variables-plugin.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/client-navbar-plugin.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/client-product-listing-plugin.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/client-product-detail-plugin.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/client-slider-plugin.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/client-popular-product-slider-plugin.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/client-pagination-plugin.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/client-my-cart-plugin.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/image-gradient-animation.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/progress-bars.js"><\/script>\n' +
-                    // '<script src="https://s3-us-west-2.amazonaws.com/airflowbucket1/flowz-builder/js/client1.js"><\/script>\n'+
-                    '<script src="./../main-files/main.js"><\/script>\n' +
-                    '</body>\n</html>';
-                }
+                                        if (rawContent.match('---')) {
+                                            let substr = rawContent.substr(rawContent.search('---'), rawContent.search('<'))
+                                            rawContent = rawContent.replace(substr, tempValueLayout)
+                                        } else {
+                                            rawContent = tempValueLayout + rawContent
+                                        }
 
-              } else {
-                let tempValueLayout = '---\nlayout: ' + this.form.Layout + '.layout\n---\n';
+                                    }
+                                }
 
-                if (newContent.match('---')) {
-                  let substr = newContent.substr(newContent.search('---'), newContent.search('<'))
-                  newContent = newContent.replace(substr, tempValueLayout)
-                } else {
-                  newContent = tempValueLayout + "<html>\n<head>\n" +
-                    "<meta content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0' name='viewport' />\n" +
-                    "<link href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css' rel='stylesheet' />\n" +
-                    "<link rel='stylesheet' href='https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css'/>\n" +
-                    "<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/themes/base/theme.min.css' />\n" +
-                    "<script src='https://code.jquery.com/jquery-3.2.1.js'><\/script>\n" +
-                    "<script src='https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.3/socket.io.js'><\/script>\n" +
-                    "<script src='https://cdn.rawgit.com/feathersjs/feathers-client/v1.1.0/dist/feathers.js'><\/script>\n" +
-                    "<script src='https://code.jquery.com/ui/1.12.1/jquery-ui.js' crossorigin='anonymous'><\/script>\n" +
-                    "<script src='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js' crossorigin='anonymous'><\/script>\n" +
-                    '<script src="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"><\/script>\n' +
-                    '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.5.2/animate.min.css">\n' +
-                    "<link rel='stylesheet' href='./../main-files/main.css'/>\n" +
-                    rawContent +
-                    '<script src="./../assets/client-plugins/global-variables-plugin.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/client-navbar-plugin.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/client-product-listing-plugin.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/client-product-detail-plugin.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/client-slider-plugin.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/client-popular-product-slider-plugin.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/client-pagination-plugin.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/client-my-cart-plugin.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/image-gradient-animation.js"><\/script>\n' +
-                    '<script src="./../assets/client-plugins/progress-bars.js"><\/script>\n' +
-                    // '<script src="https://s3-us-west-2.amazonaws.com/airflowbucket1/flowz-builder/js/client1.js"><\/script>\n'+
-                    '<script src="./../main-files/main.js"><\/script>\n' +
-                    '</body>\n</html>';
-                }
+                                this.PageLayout = '';
+                                this.form.Header = '';
+                                this.form.Footers = '';
+                                this.form.Sidebar = '';
+                                this.form.Menu = '';
+                                this.form.url = ''
+                                // console.log("rawContent:",rawContent)
+                                let previewFileName = folderUrl + '/Preview/' + nameF + '.html';
+                                // console.log("final content:\n",newContent)
+                                await axios.post(config.baseURL + '/flows-dir-listing', {
+                                        filename: previewFileName,
+                                        text: rawContent,
+                                        type: 'file'
+                                    })
+                                    .then(async (res) => {
+                                        this.saveFileLoading = false;
 
-              }
+                                        await axios.get(config.baseURL + '/metalsmith?path=' + folderUrl, {}).then((response) => {
+                                                // revert changes in metalsmith 
 
-              this.PageLayout = '';
-              this.form.Header = '';
-              this.form.Footers = '';
-              this.form.Sidebar = '';
-              this.form.Menu = '';
+                                                var metalsmithJSON = "var Metalsmith=require('metalsmith');\nvar markdown=require('metalsmith-markdown');\nvar layouts=require('metalsmith-layouts');\nvar permalinks=require('metalsmith-permalinks');\nvar fs=require('fs');\nvar Handlebars=require('handlebars');\n Metalsmith(__dirname)\n.metadata({\ntitle: \"Demo Title\",\ndescription: \"Some Description\",\ngenerator: \"Metalsmith\",\nurl: \"http://www.metalsmith.io/\"})\n.source('')\n.destination('" + folderUrl + "/public')\n.clean(false)\n.use(markdown())\n.use(layouts({engine:'handlebars',directory:'" + folderUrl + "/Layout'}))\n.build(function(err,files)\n{if(err){\nconsole.log(err)\n}});"
 
-              let previewFileName = folderUrl + '/Preview/' + nameF + '.html';
+                                                return axios.post(config.baseURL + '/flows-dir-listing', {
+                                                        filename: mainMetal,
+                                                        text: metalsmithJSON,
+                                                        type: 'file'
+                                                    })
+                                                    .then((res) => {
+                                                        let previewFile = this.$store.state.fileUrl.replace(/\\/g, "\/");
+                                                        previewFile = folderUrl.replace('/var/www/html', '');
 
-              return axios.post(config.baseURL + '/flows-dir-listing', {
-                  filename: previewFileName,
-                  text: newContent,
-                  type: 'file'
-                })
-                .then((res) => {
-                  this.saveFileLoading = false;
+                                                        window.open(config.ipAddress + previewFile + '/public/' + nameF + '.html');
 
-                  axios.get(config.baseURL + '/metalsmith?path=' + folderUrl, {}).then((response) => {
-                      // revert changes in metalsmith 
+                                                        // Delete Preview Folder
+                                                        axios.delete(config.baseURL + '/flows-dir-listing/0?filename=' + folderUrl + '/Preview')
+                                                            .then((res) => {
+                                                                console.log(res);
 
-                      var metalsmithJSON = "var Metalsmith=require('metalsmith');\nvar markdown=require('metalsmith-markdown');\nvar layouts=require('metalsmith-layouts');\nvar permalinks=require('metalsmith-permalinks');\nvar fs=require('fs');\nvar Handlebars=require('handlebars');\n Metalsmith(__dirname)\n.metadata({\ntitle: \"Demo Title\",\ndescription: \"Some Description\",\ngenerator: \"Metalsmith\",\nurl: \"http://www.metalsmith.io/\"})\n.source('')\n.destination('" + folderUrl + "/public')\n.clean(false)\n.use(markdown())\n.use(layouts({engine:'handlebars',directory:'" + folderUrl + "/Layout'}))\n.build(function(err,files)\n{if(err){\nconsole.log(err)\n}});"
+                                                                return axios.post(config.baseURL + '/flows-dir-listing', {
+                                                                        filename: folderUrl + '/Layout/' + this.form.Layout + '.layout',
+                                                                        text: layoutdata.data,
+                                                                        type: 'file'
+                                                                    })
+                                                                    .then((res) => {
+                                                                        console.log("layout file reset")
 
-                      return axios.post(config.baseURL + '/flows-dir-listing', {
-                          filename: mainMetal,
-                          text: metalsmithJSON,
-                          type: 'file'
-                        })
-                        .then((res) => {
-                          let previewFile = this.$store.state.fileUrl.replace(/\\/g, "\/");
-                          previewFile = folderUrl.replace('/var/www/html', '');
+                                                                    })
+                                                                    .catch((e) => {
+                                                                        console.log(e)
+                                                                    })
 
-                          window.open(config.ipAddress + previewFile + '/public/' + nameF + '.html');
+                                                            })
+                                                            .catch((e) => {
+                                                                console.log(e)
+                                                            })
 
-                          // Delete Preview Folder
-                          axios.delete(config.baseURL + '/flows-dir-listing/0?filename=' + folderUrl + '/Preview')
-                            .then((res) => {
-                              console.log(res);
+                                                    })
+                                                    .catch((e) => {
+                                                        console.log(e)
+                                                    })
+
+                                            })
+                                            .catch((err) => {
+                                                this.$message({
+                                                    showClose: true,
+                                                    message: 'File not saved! Please try again.',
+                                                    type: 'error'
+                                                });
+                                                console.log('Error while creating MetalSmith JS file' + err)
+                                            })
+
+                                        this.$message({
+                                            showClose: true,
+                                            message: 'File Saved!',
+                                            type: 'success'
+                                        });
+                                    })
+                                    .catch((e) => {
+                                        this.saveFileLoading = false
+                                        this.$message({
+                                            showClose: true,
+                                            message: 'File not saved! Please try again.',
+                                            type: 'error'
+                                        });
+                                        console.log(e)
+                                    })
                             })
                             .catch((e) => {
-                              console.log(e)
+                                console.log(e);
                             })
-
-                        })
-                        .catch((e) => {
-                          console.log(e)
-                        })
-
                     })
-                    .catch((err) => {
-                      this.$message({
-                        showClose: true,
-                        message: 'File not saved! Please try again.',
-                        type: 'error'
-                      });
-                      console.log('Error while creating MetalSmith JS file' + err)
+                    .catch((e) => {
+                        console.log(e)
                     })
-
-                  this.$message({
-                    showClose: true,
-                    message: 'File Saved!',
-                    type: 'success'
-                  });
-                })
-                .catch((e) => {
-                  this.saveFileLoading = false
-                  this.$message({
-                    showClose: true,
-                    message: 'File not saved! Please try again.',
-                    type: 'error'
-                  });
-                  console.log(e)
-                })
 
             })
             .catch((e) => {
-              console.log(e)
+                console.log('Error while creating MetalSmith JS file' + e)
+                this.$message({
+                    showClose: true,
+                    message: 'Cannot save file! Some error occured, try again.',
+                    type: 'danger'
+                });
             })
-
-        })
-        .catch((e) => {
-          console.log('Error while creating MetalSmith JS file' + e)
-          this.$message({
-            showClose: true,
-            message: 'Cannot save file! Some error occured, try again.',
-            type: 'danger'
-          });
-        })
     },
 
     // Create new Folder
@@ -2007,7 +2012,6 @@ export default {
           break;
         case 'GridManager':
           this.$refs.contentComponent.getHtml();
-          newContent = this.$store.state.content;
           break;
       }
         let configFileUrl = this.$store.state.fileUrl.replace(/\\/g, "\/");
@@ -2025,11 +2029,11 @@ export default {
         })
         .then(async(res) => {
           this.saveFileLoading = false
-          this.$message({
-            showClose: true,
-            message: 'File Saved!',
-            type: 'success'
-          });
+          // this.$message({
+          //   showClose: true,
+          //   message: 'File Saved!',
+          //   type: 'success'
+          // });
             var content = this.$store.state.content;
             var getFromBetween = {
               results: [],
@@ -2248,38 +2252,38 @@ export default {
             let checkValue = false;
             if (fileName.search('hbs') != -1) {
               var content = this.$store.state.content;
-              var getFromBetween = {
-                results: [],
-                string: "",
-                getFromBetween: function(sub1, sub2) {
-                  if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return false;
-                  var SP = this.string.indexOf(sub1) + sub1.length;
-                  var string1 = this.string.substr(0, SP);
-                  var string2 = this.string.substr(SP);
-                  var TP = string1.length + string2.indexOf(sub2);
-                  return this.string.substring(SP, TP);
-                },
-                removeFromBetween: function(sub1, sub2) {
-                  if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return false;
-                  var removal = sub1 + this.getFromBetween(sub1, sub2) + sub2;
-                  this.string = this.string.replace(removal, "");
-                },
-                getAllResults: function(sub1, sub2) {
-                  if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return;
-                  var result = this.getFromBetween(sub1, sub2);
-                  this.results.push(result);
-                  this.removeFromBetween(sub1, sub2);
-                  if (this.string.indexOf(sub1) > -1 && this.string.indexOf(sub2) > -1) {
-                    this.getAllResults(sub1, sub2);
-                  } else return;
-                },
-                get: function(string, sub1, sub2) {
-                  this.results = [];
-                  this.string = string;
-                  this.getAllResults(sub1, sub2);
-                  return this.results;
-                }
-              };
+              // var getFromBetween = {
+              //   results: [],
+              //   string: "",
+              //   getFromBetween: function(sub1, sub2) {
+              //     if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return false;
+              //     var SP = this.string.indexOf(sub1) + sub1.length;
+              //     var string1 = this.string.substr(0, SP);
+              //     var string2 = this.string.substr(SP);
+              //     var TP = string1.length + string2.indexOf(sub2);
+              //     return this.string.substring(SP, TP);
+              //   },
+              //   removeFromBetween: function(sub1, sub2) {
+              //     if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return false;
+              //     var removal = sub1 + this.getFromBetween(sub1, sub2) + sub2;
+              //     this.string = this.string.replace(removal, "");
+              //   },
+              //   getAllResults: function(sub1, sub2) {
+              //     if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return;
+              //     var result = this.getFromBetween(sub1, sub2);
+              //     this.results.push(result);
+              //     this.removeFromBetween(sub1, sub2);
+              //     if (this.string.indexOf(sub1) > -1 && this.string.indexOf(sub2) > -1) {
+              //       this.getAllResults(sub1, sub2);
+              //     } else return;
+              //   },
+              //   get: function(string, sub1, sub2) {
+              //     this.results = [];
+              //     this.string = string;
+              //     this.getAllResults(sub1, sub2);
+              //     return this.results;
+              //   }
+              // };
               var result = (getFromBetween.get(content, "{{>", "}}"));
 
               var resultParam = result
@@ -2441,10 +2445,10 @@ export default {
     },
 
     async dialogFormVisibleAdd() {
+      console.log("this.form.namearray:",this.form.namearray)
       let configFileUrl = this.$store.state.fileUrl.replace(/\\/g, "\/");
       let urlparts = configFileUrl.split("/");
       let fileNameOrginal = urlparts[urlparts.length - 1];
-
       let foldername = urlparts[urlparts.length - 2];
       let fileName = '/' + urlparts[urlparts.length - 2] + '/' + urlparts[urlparts.length - 1];
       var folderUrl = configFileUrl.replace(fileName, '');
@@ -2527,882 +2531,118 @@ export default {
                       }
                   }
               }
-              // else if( (temp[j+1]== undefined ))
-              // {
-              //   console.log("inside else:")
-              //   //Here there are no parameter at all, So defining it default.
-              //   console.log(" inside else[j]1:",temp[j])
-              //   let self = this;
-              //   setTimeout(function(){
-              //     self.$notify({
-              //         title: 'AutoSet ',
-              //         message: temp[j]+" id='default.html'",
-              //         type:'success'
-              //       });  
-              //   },100);
-              //   console.log("inside else[j]:",temp[j])
-
-              //   let obj = {}
-              //   obj[temp[j]] ='default.html' 
-              //   DefaultParams.push(obj)
-              // }
           }
       }
-      for (let k = 0; k < result.length; k++) {
-      let ch = false
-      for (let r = 0; r < DefaultParams.length; r++) {
-        if (Object.keys(DefaultParams[r]) == result[k]) {
-          ch = true
-        }
-      }
-      if (ch == false) {
-        let self = this;
-        setTimeout(function() {
-          self.$notify({
-            title: 'AutoSet',
-            message: result[k] + " id='default.html'",
-            type: 'success'
-          });
-        }, 100);
+      console.log("DefaultParams:",DefaultParams)
+      
+      for(let z=0;z<Object.keys(this.form.checked).length;z++){   
+        if (this.form.checked[Object.keys(this.form.checked)]==true) {
+          for (let k = 0; k < result.length; k++) {
+            let ch = false
+            for (let r = 0; r < DefaultParams.length; r++) {
+              if (Object.keys(DefaultParams[r]) == result[k]) {
+                ch = true
+              }
+            }
+            if (ch == false) {
+              let self = this;
+              setTimeout(function() {
+                self.$notify({
+                  title: 'AutoSet',
+                  message: result[k] + " id='default.html'",
+                  type: 'success'
+                });
+              }, 100);
 
-        let obj = {}
-        obj[result[k]] = 'default.html'
-        DefaultParams.push(obj)
+              let obj = {}
+              obj[result[k]] = 'default.html'
+              DefaultParams.push(obj)
 
-      }
-    }
-
-      if (Object.keys(this.form.checked).length > 0) {
-        for (let k = 0; k < Object.keys(this.form.checked).length; k++) {
-          let newName = Object.keys(this.form.checked)[k]
-          let newFolderName = folderUrl + '/' + Object.keys(this.form.checked)[k];
-          await axios.post(config.baseURL + '/flows-dir-listing', {
-              foldername: newFolderName,
-              type: 'folder'
-            })
-            .then(async (res) => {
-              this.newFolderDialog = false
-              this.addNewFolderLoading = false
-              let x = newName
-              this.addNewFileLoading = true
-              let newfilename = newFolderName + '/default.html'
-              await axios.post(config.baseURL + '/flows-dir-listing', {
-                  filename: newfilename,
-                  text: ' ',
-                  type: 'file'
-                })
-                .then((res) => {
-                  this.newFileDialog = false
-                  this.addNewFileLoading = false
-                  this.formAddFile.filename = null
-                  this.globalConfigData[2].layoutOptions[0][x] = [];
-                  let temp1 = {
-                    value: "default",
-                    label: "default"
-                  }
-                  this.globalConfigData[2].layoutOptions[0][x].push(temp1)
-                  /****
-                  updating function 
-                  ***/
-                  let totalPartial = content.match(/{{>/g).length;
-                  let namefile = fileNameOrginal.split('.')[0];
-                  let namefolder = foldername;
-                  let temp = {
-                    value: namefile,
-                    label: namefile,
-                    partialsList: result,
-                    defaultList: DefaultParams
-                  }
-                  let checkValue = false;
-                  for (var i = 0; i < Object.keys(this.globalConfigData[2].layoutOptions[0]).length; i++) {
-                    var obj = Object.keys(this.globalConfigData[2].layoutOptions[0])[i];
-                    // console.log("obj:", obj)
-                    if ((obj) == namefolder) {
-                      checkValue = true;
+            }
+          }
+          for (let k = 0; k < Object.keys(this.form.checked).length; k++) {
+            let newName = Object.keys(this.form.checked)[k]
+            let newFolderName = folderUrl + '/' + Object.keys(this.form.checked)[k];
+            await axios.post(config.baseURL + '/flows-dir-listing', {
+                foldername: newFolderName,
+                type: 'folder'
+              })
+              .then(async (res) => {
+                this.newFolderDialog = false
+                this.addNewFolderLoading = false
+                let x = newName
+                this.addNewFileLoading = true
+                let newfilename = newFolderName + '/default.html'
+                await axios.post(config.baseURL + '/flows-dir-listing', {
+                    filename: newfilename,
+                    text: ' ',
+                    type: 'file'
+                  })
+                  .then((res) => {
+                    this.newFileDialog = false
+                    this.addNewFileLoading = false
+                    this.formAddFile.filename = null
+                    this.globalConfigData[2].layoutOptions[0][x] = [];
+                    let temp1 = {
+                      value: "default",
+                      label: "default"
                     }
-                  }
-                  if (checkValue == true) {
-                    let checkFileNamevalue = false;
-                    for (let j = 0; j < this.globalConfigData[2].layoutOptions[0][namefolder].length; j++) {
-                      if (this.globalConfigData[2].layoutOptions[0][namefolder][j].label == namefile) {
-                        checkFileNamevalue = true
-                        this.globalConfigData[2].layoutOptions[0][namefolder][j].partialsList = [];
-                        this.globalConfigData[2].layoutOptions[0][namefolder][j].defaultList = [];
-                        this.globalConfigData[2].layoutOptions[0][namefolder][j].partialsList = result;
-                        this.globalConfigData[2].layoutOptions[0][namefolder][j].defaultList = DefaultParams;
+                    this.globalConfigData[2].layoutOptions[0][x].push(temp1)
+                    /****
+                    updating function 
+                    ***/
+                    let totalPartial = content.match(/{{>/g).length;
+                    let namefile = fileNameOrginal.split('.')[0];
+                    let namefolder = foldername;
+                    let temp = {
+                      value: namefile,
+                      label: namefile,
+                      partialsList: result,
+                      defaultList: DefaultParams
+                    }
+                    let checkValue = false;
+                    for (var i = 0; i < Object.keys(this.globalConfigData[2].layoutOptions[0]).length; i++) {
+                      var obj = Object.keys(this.globalConfigData[2].layoutOptions[0])[i];
+                      // console.log("obj:", obj)
+                      if ((obj) == namefolder) {
+                        checkValue = true;
                       }
                     }
-                    if (checkFileNamevalue != true) {
-                      this.globalConfigData[2].layoutOptions[0][namefolder].push(temp)
+                    if (checkValue == true) {
+                      let checkFileNamevalue = false;
+                      for (let j = 0; j < this.globalConfigData[2].layoutOptions[0][namefolder].length; j++) {
+                        if (this.globalConfigData[2].layoutOptions[0][namefolder][j].label == namefile) {
+                          checkFileNamevalue = true
+                          this.globalConfigData[2].layoutOptions[0][namefolder][j].partialsList = [];
+                          this.globalConfigData[2].layoutOptions[0][namefolder][j].defaultList = [];
+                          this.globalConfigData[2].layoutOptions[0][namefolder][j].partialsList = result;
+                          this.globalConfigData[2].layoutOptions[0][namefolder][j].defaultList = DefaultParams;
+                        }
+                      }
+                      if (checkFileNamevalue != true) {
+                        this.globalConfigData[2].layoutOptions[0][namefolder].push(temp)
+                      }
+                      this.saveConfigFile(folderUrl);
+                    } else {
+                      this.saveConfigFile(folderUrl);
                     }
-                    this.saveConfigFile(folderUrl);
-                  } else {
-                    this.saveConfigFile(folderUrl);
-                  }
-                })
-                .catch((e) => {
-                  console.log(e)
-                })
-            })
-            .catch((e) => {
-              console.log(e)
-            })
-        }
+                  })
+                  .catch((e) => {
+                    console.log(e)
+                  })
+              })
+              .catch((e) => {
+                console.log(e)
+              })
+          }
 
-        this.form.checked = []
-        this.form.namearray = []
+          this.form.checked = []
+          this.form.namearray = []
+        }
       }
       this.form.checked = []
       this.form.namearray = []
     },
-
-
-
-    // Save file with autometalsmith folders from layout and hbs file
-    // saveFile() {
-    //   this.saveFileLoading = true
-    //   let newContent = this.$store.state.content;
-    //   switch (this.componentId) {
-    //     case 'GrapesComponent':
-    //       this.$refs.contentComponent.getHtml();
-    //       newContent = this.$store.state.content;
-    //       break;
-    //     case 'json-viewer':
-    //       newContent = JSON.stringify(this.$store.state.content);
-    //       break;
-    //     case 'GridManager':
-    //       this.$refs.contentComponent.getHtml();
-    //       newContent = this.$store.state.content;
-    //       break;
-    //   }
-
-    //   axios.post(config.baseURL + '/flows-dir-listing', {
-    //       filename: this.currentFile.path.replace(/\\/g, "\/"),
-    //       text: newContent,
-    //       type: 'file'
-    //     })
-    //     .then(async(res) => {
-    //       this.saveFileLoading = false
-    //       this.$message({
-    //         showClose: true,
-    //         message: 'File Saved!',
-    //         type: 'success'
-    //       });
-    //       if (this.currentFile.path.replace(/\\/g, "\/").match('Footer')) {
-    //         let configFileUrl = this.$store.state.fileUrl.replace(/\\/g, "\/");
-    //         let urlparts = configFileUrl.split("/");
-    //         let fileNameOrginal = urlparts[urlparts.length - 1];
-    //         let foldername = urlparts[urlparts.length - 2];
-    //         let fileName = '/' + urlparts[urlparts.length - 2] + '/' + urlparts[urlparts.length - 1];
-    //         var folderUrl = configFileUrl.replace(fileName, '');
-
-    //         this.getConfigFileData(folderUrl);
-    //         // let configData = await axios.get(config.baseURL + '/flows-dir-listing/0?path=' + folderUrl + '/assets/config.json');
-
-    //         // this.layoutSettings = JSON.parse(configData.data);
-    //         let checkValue = false;
-    //         if (fileName.search('hbs') != -1) {
-    //           var content = this.$store.state.content;
-    //           var getFromBetween = {
-    //             results: [],
-    //             string: "",
-    //             getFromBetween: function(sub1, sub2) {
-    //               if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return false;
-    //               var SP = this.string.indexOf(sub1) + sub1.length;
-    //               var string1 = this.string.substr(0, SP);
-    //               var string2 = this.string.substr(SP);
-    //               var TP = string1.length + string2.indexOf(sub2);
-    //               return this.string.substring(SP, TP);
-    //             },
-    //             removeFromBetween: function(sub1, sub2) {
-    //               if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return false;
-    //               var removal = sub1 + this.getFromBetween(sub1, sub2) + sub2;
-    //               this.string = this.string.replace(removal, "");
-    //             },
-    //             getAllResults: function(sub1, sub2) {
-    //               // first check to see if we do have both substrings
-    //               if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return;
-    //               // find one result
-    //               var result = this.getFromBetween(sub1, sub2);
-    //               // push it to the results array
-    //               this.results.push(result);
-    //               // remove the most recently found one from the string
-    //               this.removeFromBetween(sub1, sub2);
-    //               // if there's more substrings
-    //               if (this.string.indexOf(sub1) > -1 && this.string.indexOf(sub2) > -1) {
-    //                 this.getAllResults(sub1, sub2);
-    //               } else return;
-    //             },
-    //             get: function(string, sub1, sub2) {
-    //               this.results = [];
-    //               this.string = string;
-    //               this.getAllResults(sub1, sub2);
-    //               return this.results;
-    //             }
-    //           };
-    //           var result = (getFromBetween.get(content, "{{>", "}}"));
-    //           var resultParam = result
-    //           var DefaultParams = [];
-    //           for (let i = 0; i < resultParam.length; i++) {
-    //             var temp;
-    //             temp = resultParam[i].trim()
-    //             result[i] = result[i].trim()
-    //             temp = temp.replace(/&nbsp;/g, ' ')
-    //             temp = temp.replace(/\s+/g, ' ');
-    //             temp = temp.split(' ')
-    //             for (let j = 0; j < temp.length; j++) {
-    //               if ((temp[j].indexOf('id') != -1 || temp[j].indexOf('=') != -1)) {
-    //                 // console.log("condition check value:",temp[j+1],':-',temp[j+1].search('.'))
-    //                 if (temp[j + 1] != undefined) {
-    //                   result[i] = temp[0];
-    //                   if (temp[j + 1].indexOf('.') > -1) {
-    //                     let x = temp[j + 1]
-    //                     x = temp[j + 1].split(/'/)[1];
-    //                     let obj = {}
-    //                     obj[temp[0]] = x
-    //                     DefaultParams.push(obj)
-    //                     break;
-    //                   }
-    //                 } else if ((temp[j].indexOf('.') > -1) && (temp[j + 1] == undefined)) {
-    //                   result[i] = temp[0];
-    //                   if (temp[j]) {
-    //                     let x = temp[j]
-    //                     x = temp[j].split(/'/)[1];
-    //                     let obj = {}
-    //                     obj[temp[0]] = x
-    //                     DefaultParams.push(obj)
-    //                     break;
-    //                   }
-    //                 }
-    //               } else if ((temp[j + 1] == undefined)) {
-    //                 let obj = {}
-    //                 obj[temp[j]] = 'default.html'
-    //                 DefaultParams.push(obj)
-    //               }
-    //             }
-    //           }
-
-    //           /*****
-    //             adding new code for prompt 
-    //           ******/
-
-    //           var foldernameKey = Object.keys(this.globalConfigData[2].layoutOptions[0])
-    //           for (var i = 0; i < result.length; i++) {
-    //             var check = false;
-    //             for (var j = 0; j < foldernameKey.length; j++) {
-    //               if (result[i] == foldernameKey[j]) {
-    //                 check = true
-    //               }
-    //             }
-    //             if (check == false) {
-    //               this.form.namearray.push(result[i])
-    //             }
-    //           }
-    //           /**
-    //             prompt user here
-    //           **/
-    //           if (this.form.namearray.length > 0) {
-    //             this.dialogFormVisible = true
-    //           } else {
-    //             let totalPartial = content.match(/{{>/g).length;
-    //             let namefile = fileNameOrginal.split('.')[0];
-    //             let namefolder = foldername;
-    //             let temp = {
-    //               value: namefile,
-    //               label: namefile,
-    //               partialsList: result,
-    //               defaultList: DefaultParams
-    //             }
-    //             let checkValue = false;
-    //             for (var i = 0; i < Object.keys(this.globalConfigData[2].layoutOptions[0]).length; i++) {
-    //               var obj = Object.keys(this.globalConfigData[2].layoutOptions[0])[i];
-    //               if ((obj) == namefolder) {
-    //                 checkValue = true;
-    //               }
-    //             }
-    //             if (checkValue == true) {
-    //               let checkFileNamevalue = false;
-    //               for (let j = 0; j < this.globalConfigData[2].layoutOptions[0][namefolder].length; j++) {
-    //                 if (this.globalConfigData[2].layoutOptions[0][namefolder][j].label == namefile) {
-    //                   checkFileNamevalue = true
-    //                   this.globalConfigData[2].layoutOptions[0][namefolder][j].partialsList = [];
-    //                   this.globalConfigData[2].layoutOptions[0][namefolder][j].defaultList = [];
-    //                   this.globalConfigData[2].layoutOptions[0][namefolder][j].partialsList = result;
-    //                   this.globalConfigData[2].layoutOptions[0][namefolder][j].defaultList = DefaultParams;
-    //                 }
-    //               }
-    //               if (checkFileNamevalue != true) {
-    //                 this.globalConfigData[2].layoutOptions[0][namefolder].push(temp)
-    //               }
-    //               this.saveConfigFile(folderUrl);
-    //             } else {
-    //               this.saveConfigFile(folderUrl);
-    //             }
-    //           }
-    //           console.log("back from dialog pop up")
-
-    //         } else {
-    //           let name = this.currentFile.path.replace(/\\/g, "\/").substring(this.currentFile.path.replace(/\\/g, "\/").indexOf('Footer/') + 7, this.currentFile.path.replace(/\\/g, "\/").indexOf('.html'));
-    //           let temp = {
-    //             value: name,
-    //             label: name
-    //           }
-    //           let checkValue = false;
-    //           for (var i = 0; i < this.globalConfigData[2].layoutOptions[0].Footer.length; i++) {
-    //             var obj = this.globalConfigData[2].layoutOptions[0].Footer[i];
-    //             if ((obj.label) == name) {
-    //               checkValue = true;
-    //             }
-    //           }
-    //           if (checkValue == true) {
-    //             console.log("file already exists")
-    //           } else {
-    //             this.globalConfigData[2].layoutOptions[0].Footer.push(temp);
-
-    //             // saveConfigFile
-    //             this.saveConfigFile(folderUrl);
-    //           }
-    //         }
-
-    //       } else if (this.currentFile.path.replace(/\\/g, "\/").match('Layout')) {
-    //         let configFileUrl = this.$store.state.fileUrl.replace(/\\/g, "\/");
-    //         let urlparts = configFileUrl.split("/");
-    //         let fileNameOrginal = urlparts[urlparts.length - 1];
-    //         let fileName = '/' + urlparts[urlparts.length - 2] + '/' + urlparts[urlparts.length - 1];
-    //         var folderUrl = configFileUrl.replace(fileName, '');
-
-    //         this.getConfigFileData(folderUrl);
-    //         // let configData = await axios.get(config.baseURL + '/flows-dir-listing/0?path=' + folderUrl + '/assets/config.json');
-
-    //         // this.globalConfigData = JSON.parse(configData.data);
-    //         var content = this.$store.state.content;
-    //         var getFromBetween = {
-    //           results: [],
-    //           string: "",
-    //           getFromBetween: function(sub1, sub2) {
-    //             if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return false;
-    //             var SP = this.string.indexOf(sub1) + sub1.length;
-    //             var string1 = this.string.substr(0, SP);
-    //             var string2 = this.string.substr(SP);
-    //             var TP = string1.length + string2.indexOf(sub2);
-    //             return this.string.substring(SP, TP);
-    //           },
-    //           removeFromBetween: function(sub1, sub2) {
-    //             if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return false;
-    //             var removal = sub1 + this.getFromBetween(sub1, sub2) + sub2;
-    //             this.string = this.string.replace(removal, "");
-    //           },
-    //           getAllResults: function(sub1, sub2) {
-    //             // first check to see if we do have both substrings
-    //             if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return;
-    //             // find one result
-    //             var result = this.getFromBetween(sub1, sub2);
-    //             // push it to the results array
-    //             this.results.push(result);
-    //             // remove the most recently found one from the string
-    //             this.removeFromBetween(sub1, sub2);
-    //             // if there's more substrings
-    //             if (this.string.indexOf(sub1) > -1 && this.string.indexOf(sub2) > -1) {
-    //               this.getAllResults(sub1, sub2);
-    //             } else return;
-    //           },
-    //           get: function(string, sub1, sub2) {
-    //             this.results = [];
-    //             this.string = string;
-    //             this.getAllResults(sub1, sub2);
-    //             return this.results;
-    //           }
-    //         };
-    //         var result = (getFromBetween.get(content, "{{>", "}}"));
-    //         var resultParam = result
-    //         var DefaultParams = [];
-    //         for (let i = 0; i < resultParam.length; i++) {
-    //           var temp;
-    //           temp = resultParam[i].trim()
-    //           result[i] = result[i].trim()
-    //           temp = temp.replace(/&nbsp;/g, ' ')
-    //           temp = temp.replace(/\s+/g, ' ');
-    //           temp = temp.trim()
-    //           temp = temp.split(' ')
-    //           for (let j = 0; j < temp.length; j++) {
-    //             if ((temp[j].indexOf('id') != -1 || temp[j].indexOf('=') != -1)) {
-    //               if (temp[j + 1] != undefined) {
-    //                 result[i] = temp[0];
-    //                 if (temp[j + 1].indexOf('.') > -1) {
-    //                   let x = temp[j + 1]
-    //                   x = temp[j + 1].split(/'/)[1];
-    //                   let obj = {}
-    //                   obj[temp[0]] = x
-    //                   DefaultParams.push(obj)
-    //                   break;
-    //                 }
-    //               } else if ((temp[j].indexOf('.') > -1) && (temp[j + 1] == undefined)) {
-    //                 result[i] = temp[0];
-    //                 if (temp[j]) {
-    //                   let x = temp[j]
-    //                   x = temp[j].split(/'/)[1];
-    //                   let obj = {}
-    //                   obj[temp[0]] = x
-    //                   DefaultParams.push(obj)
-    //                   break;
-    //                 }
-    //               }
-    //             }
-    //           }
-    //         }
-
-    //         let totalPartial = content.match(/{{>/g).length;
-    //         let name = this.currentFile.path.replace(/\\/g, "\/").substring(this.currentFile.path.replace(/\\/g, "\/").indexOf('Layout/') + 7, this.currentFile.path.replace(/\\/g, "\/").indexOf('.layout'));
-    //         let temp = {
-    //           value: name,
-    //           label: name,
-    //           partialsList: result,
-    //           defaultList: DefaultParams
-
-    //         }
-
-    //         let checkValue = false;
-    //         for (var i = 0; i < this.globalConfigData[2].layoutOptions[0].Layout.length; i++) {
-    //           var obj = this.globalConfigData[2].layoutOptions[0].Layout[i];
-    //           if ((obj.label) == name) {
-    //             checkValue = true;
-    //             // obj.partialsList=result
-    //           }
-    //         }
-    //         if (checkValue == true) {
-    //           let currentFileIndex = daex.indexFirst(this.globalConfigData[2].layoutOptions[0].Layout, {
-    //             'label': name
-    //           });
-    //           this.globalConfigData[2].layoutOptions[0].Layout[currentFileIndex].partialsList = result;
-    //           this.globalConfigData[2].layoutOptions[0].Layout[currentFileIndex].defaultList = DefaultParams;
-
-    //           this.saveConfigFile(folderUrl);
-    //         } else {
-    //           this.globalConfigData[2].layoutOptions[0].Layout.push(temp);
-
-    //           // saveConfigFile
-    //           this.saveConfigFile(folderUrl);
-    //         }
-    //         var foldernameKey = Object.keys(this.globalConfigData[2].layoutOptions[0])
-    //         for (var i = 0; i < result.length; i++) {
-    //           var check = false;
-    //           for (var j = 0; j < foldernameKey.length; j++) {
-    //             if (result[i] == foldernameKey[j]) {
-    //               check = true
-    //             }
-    //           }
-    //           if (check == false) {
-    //             let newName = result[i]
-    //             let newFolderName = folderUrl + '/' + result[i];
-    //             axios.post(config.baseURL + '/flows-dir-listing', {
-    //                 foldername: newFolderName,
-    //                 type: 'folder'
-    //               })
-    //               .then((res) => {
-    //                 this.newFolderDialog = false
-    //                 this.addNewFolderLoading = false
-    //                 let x = newName
-
-    //                 // this.saveConfigFile(folderUrl);
-    //                 this.addNewFileLoading = true
-
-    //                 let newfilename = newFolderName + '/default.html'
-    //                 axios.post(config.baseURL + '/flows-dir-listing', {
-    //                     filename: newfilename,
-    //                     text: ' ',
-    //                     type: 'file'
-    //                   })
-    //                   .then((res) => {
-    //                     this.newFileDialog = false
-    //                     this.addNewFileLoading = false
-    //                     this.formAddFile.filename = null
-    //                     this.globalConfigData[2].layoutOptions[0][x] = [];
-    //                     let temp = {
-    //                       value: "default",
-    //                       label: "default"
-    //                     }
-    //                     this.globalConfigData[2].layoutOptions[0][x].push(temp)
-    //                     this.saveConfigFile(folderUrl);
-    //                   })
-    //                   .catch((e) => {
-    //                     console.log(e)
-    //                   })
-    //               })
-    //               .catch((e) => {
-    //                 console.log(e)
-    //               })
-    //           }
-    //         }
-    //       } else {
-    //         let configFileUrl = this.$store.state.fileUrl.replace(/\\/g, "\/");
-    //         let urlparts = configFileUrl.split("/");
-    //         let fileNameOrginal = urlparts[urlparts.length - 1];
-    //         let foldername = urlparts[urlparts.length - 2];
-    //         let fileName = '/' + urlparts[urlparts.length - 2] + '/' + urlparts[urlparts.length - 1];
-    //         var folderUrl = configFileUrl.replace(fileName, '');
-
-    //         this.getConfigFileData(folderUrl);
-    //         // let configData = await axios.get(config.baseURL + '/flows-dir-listing/0?path=' + folderUrl + '/assets/config.json');
-    //         // this.layoutSettings = JSON.parse(configData.data);
-    //         let checkValue = false;
-    //         if (fileName.search('hbs') != -1) {
-    //           var content = this.$store.state.content;
-    //           var getFromBetween = {
-    //             results: [],
-    //             string: "",
-    //             getFromBetween: function(sub1, sub2) {
-    //               if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return false;
-    //               var SP = this.string.indexOf(sub1) + sub1.length;
-    //               var string1 = this.string.substr(0, SP);
-    //               var string2 = this.string.substr(SP);
-    //               var TP = string1.length + string2.indexOf(sub2);
-    //               return this.string.substring(SP, TP);
-    //             },
-    //             removeFromBetween: function(sub1, sub2) {
-    //               if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return false;
-    //               var removal = sub1 + this.getFromBetween(sub1, sub2) + sub2;
-    //               this.string = this.string.replace(removal, "");
-    //             },
-    //             getAllResults: function(sub1, sub2) {
-    //               // first check to see if we do have both substrings
-    //               if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return;
-    //               // find one result
-    //               var result = this.getFromBetween(sub1, sub2);
-    //               // push it to the results array
-    //               this.results.push(result);
-    //               // remove the most recently found one from the string
-    //               this.removeFromBetween(sub1, sub2);
-    //               // if there's more substrings
-    //               if (this.string.indexOf(sub1) > -1 && this.string.indexOf(sub2) > -1) {
-    //                 this.getAllResults(sub1, sub2);
-    //               } else return;
-    //             },
-    //             get: function(string, sub1, sub2) {
-    //               this.results = [];
-    //               this.string = string;
-    //               this.getAllResults(sub1, sub2);
-    //               return this.results;
-    //             }
-    //           };
-    //           var result = (getFromBetween.get(content, "{{>", "}}"));
-    //           var resultParam = result
-    //           var DefaultParams = [];
-    //           for (let i = 0; i < resultParam.length; i++) {
-    //             var temp;
-    //             temp = resultParam[i].trim()
-    //             result[i] = result[i].trim()
-    //             temp = temp.replace(/&nbsp;/g, ' ')
-    //             temp = temp.replace(/\s+/g, ' ');
-    //             temp = temp.split(' ')
-    //             for (let j = 0; j < temp.length; j++) {
-    //               if ((temp[j].indexOf('id') != -1 || temp[j].indexOf('=') != -1)) {
-    //                 // console.log("condition check value:",temp[j+1],':-',temp[j+1].search('.'))
-    //                 if (temp[j + 1] != undefined) {
-    //                   result[i] = temp[0];
-    //                   if (temp[j + 1].indexOf('.') > -1) {
-    //                     let x = temp[j + 1]
-    //                     x = temp[j + 1].split(/'/)[1];
-    //                     let obj = {}
-    //                     obj[temp[0]] = x
-    //                     DefaultParams.push(obj)
-    //                     break;
-    //                   }
-    //                 } else if ((temp[j].indexOf('.') > -1) && (temp[j + 1] == undefined)) {
-    //                   result[i] = temp[0];
-    //                   if (temp[j]) {
-    //                     let x = temp[j]
-    //                     x = temp[j].split(/'/)[1];
-    //                     let obj = {}
-    //                     obj[temp[0]] = x
-    //                     DefaultParams.push(obj)
-    //                     break;
-    //                   }
-    //                 }
-    //               } else if ((temp[j + 1] == undefined)) {
-    //                 let obj = {}
-    //                 obj[temp[j]] = 'default.html'
-    //                 DefaultParams.push(obj)
-    //               }
-    //             }
-    //           }
-
-    //           /*****
-    //             adding new code for prompt 
-    //           ******/
-
-    //           var foldernameKey = Object.keys(this.globalConfigData[2].layoutOptions[0])
-    //           for (var i = 0; i < result.length; i++) {
-    //             var check = false;
-    //             for (var j = 0; j < foldernameKey.length; j++) {
-    //               if (result[i] == foldernameKey[j]) {
-    //                 check = true
-    //               }
-    //             }
-    //             if (check == false) {
-    //               this.form.namearray.push(result[i])
-    //             }
-    //           }
-    //           /**
-    //             prompt user here
-    //           **/
-
-    //           if (this.form.namearray.length > 0) {
-    //             this.dialogFormVisible = true
-    //           } else {
-    //             let totalPartial = content.match(/{{>/g).length;
-    //             let namefile = fileNameOrginal.split('.')[0];
-    //             let namefolder = foldername;
-    //             let temp = {
-    //               value: namefile,
-    //               label: namefile,
-    //               partialsList: result,
-    //               defaultList: DefaultParams
-    //             }
-    //             let checkValue = false;
-    //             for (var i = 0; i < Object.keys(this.globalConfigData[2].layoutOptions[0]).length; i++) {
-    //               var obj = Object.keys(this.globalConfigData[2].layoutOptions[0])[i];
-    //               if ((obj) == namefolder) {
-    //                 checkValue = true;
-    //               }
-    //             }
-    //             if (checkValue == true) {
-    //               let checkFileNamevalue = false;
-    //               for (let j = 0; j < this.globalConfigData[2].layoutOptions[0][namefolder].length; j++) {
-    //                 if (this.globalConfigData[2].layoutOptions[0][namefolder][j].label == namefile) {
-    //                   checkFileNamevalue = true
-    //                   this.globalConfigData[2].layoutOptions[0][namefolder][j].partialsList = [];
-    //                   this.globalConfigData[2].layoutOptions[0][namefolder][j].defaultList = [];
-    //                   this.globalConfigData[2].layoutOptions[0][namefolder][j].partialsList = result;
-    //                   this.globalConfigData[2].layoutOptions[0][namefolder][j].defaultList = DefaultParams;
-    //                 }
-    //               }
-    //               if (checkFileNamevalue != true) {
-    //                 this.globalConfigData[2].layoutOptions[0][namefolder].push(temp)
-    //               }
-    //               this.saveConfigFile(folderUrl);
-    //             } else {
-    //               // saveConfigFile
-    //               this.saveConfigFile(folderUrl);
-    //             }
-    //           }
-
-    //         } else {
-    //           let name = this.currentFile.path.replace(/\\/g, "\/").substring(this.currentFile.path.replace(/\\/g, "\/").indexOf(foldername) + foldername.length + 1, this.currentFile.path.replace(/\\/g, "\/").indexOf('.'));
-    //           let temp = {
-    //             value: name,
-    //             label: name
-    //           }
-    //           let checkValue = false;
-    //           if (this.globalConfigData[2].layoutOptions[0][foldername]) {
-    //             for (var i = 0; i < this.globalConfigData[2].layoutOptions[0][foldername].length; i++) {
-    //               var obj = this.globalConfigData[2].layoutOptions[0][foldername][i];
-    //               if ((obj.label) == name) {
-    //                 checkValue = true;
-    //               }
-    //             }
-    //             if (checkValue == true) {} else {
-    //               this.globalConfigData[2].layoutOptions[0][foldername].push(temp);
-    //               // saveConfigFile
-    //               this.saveConfigFile(folderUrl);
-    //             }
-    //           } else {
-    //             this.globalConfigData[2].layoutOptions[0][foldername] = [];
-    //             this.globalConfigData[2].layoutOptions[0][foldername].push(temp)
-    //             this.saveConfigFile(folderUrl);
-    //           }
-    //         }
-    //       }
-    //     })
-    //     .catch((e) => {
-    //       this.saveFileLoading = false
-    //         // this.$message({
-    //         //     showClose: true,
-    //         //     message: 'File not saved! Please try again.',
-    //         //     type: 'error'
-    //         // });
-    //       console.log('Some error occured. Full log here: ', e);
-    //     })
-    //   this.form.checked = [];
-    //   this.form.namearray = [];
-    // },
-    
-    // // New Partials confirmation dialog
-    // async dialogFormVisibleAdd() {
-    //   let configFileUrl = this.$store.state.fileUrl.replace(/\\/g, "\/");
-    //   let urlparts = configFileUrl.split("/");
-    //   let fileNameOrginal = urlparts[urlparts.length - 1];
-    //   let foldername = urlparts[urlparts.length - 2];
-    //   let fileName = '/' + urlparts[urlparts.length - 2] + '/' + urlparts[urlparts.length - 1];
-    //   var folderUrl = configFileUrl.replace(fileName, '');
-
-    //   this.getConfigFileData(folderUrl);
-
-    //   var content = this.$store.state.content;
-    //   // let configData = await axios.get(config.baseURL + '/flows-dir-listing/0?path=' + folderUrl + '/assets/config.json');
-    //   var getFromBetween = {
-    //     results: [],
-    //     string: "",
-    //     getFromBetween: function(sub1, sub2) {
-    //       if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return false;
-    //       var SP = this.string.indexOf(sub1) + sub1.length;
-    //       var string1 = this.string.substr(0, SP);
-    //       var string2 = this.string.substr(SP);
-    //       var TP = string1.length + string2.indexOf(sub2);
-    //       return this.string.substring(SP, TP);
-    //     },
-    //     removeFromBetween: function(sub1, sub2) {
-    //       if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return false;
-    //       var removal = sub1 + this.getFromBetween(sub1, sub2) + sub2;
-    //       this.string = this.string.replace(removal, "");
-    //     },
-    //     getAllResults: function(sub1, sub2) {
-    //       // first check to see if we do have both substrings
-    //       if (this.string.indexOf(sub1) < 0 || this.string.indexOf(sub2) < 0) return;
-    //       // find one result
-    //       var result = this.getFromBetween(sub1, sub2);
-    //       // push it to the results array
-    //       this.results.push(result);
-    //       // remove the most recently found one from the string
-    //       this.removeFromBetween(sub1, sub2);
-    //       // if there's more substrings
-    //       if (this.string.indexOf(sub1) > -1 && this.string.indexOf(sub2) > -1) {
-    //         this.getAllResults(sub1, sub2);
-    //       } else return;
-    //     },
-    //     get: function(string, sub1, sub2) {
-    //       this.results = [];
-    //       this.string = string;
-    //       this.getAllResults(sub1, sub2);
-    //       return this.results;
-    //     }
-    //   };
-    //   var result = (getFromBetween.get(content, "{{>", "}}"));
-    //   var resultParam = result
-    //   var DefaultParams = [];
-    //   for (let i = 0; i < resultParam.length; i++) {
-    //     var temp;
-    //     temp = resultParam[i].trim()
-    //     result[i] = result[i].trim()
-    //     temp = temp.replace(/&nbsp;/g, ' ')
-    //     temp = temp.replace(/\s+/g, ' ');
-    //     temp = temp.split(' ')
-    //     for (let j = 0; j < temp.length; j++) {
-    //       if ((temp[j].indexOf('id') != -1 || temp[j].indexOf('=') != -1)) {
-    //         if (temp[j + 1] != undefined) {
-    //           result[i] = temp[0];
-    //           if (temp[j + 1].indexOf('.') > -1) {
-    //             let x = temp[j + 1]
-    //             x = temp[j + 1].split(/'/)[1];
-    //             let obj = {}
-    //             obj[temp[0]] = x
-    //             DefaultParams.push(obj)
-    //             break;
-    //           }
-    //         } else if ((temp[j].indexOf('.') > -1) && (temp[j + 1] == undefined)) {
-    //           result[i] = temp[0];
-    //           if (temp[j]) {
-    //             let x = temp[j]
-    //             x = temp[j].split(/'/)[1];
-    //             let obj = {}
-    //             obj[temp[0]] = x
-    //             DefaultParams.push(obj)
-    //             break;
-    //           }
-    //         }
-    //       }
-    //       else if((temp[j+1]== undefined )){
-    //         let obj = {}
-    //         obj[temp[j]] ='default.html' 
-    //         DefaultParams.push(obj)
-    //       }
-    //     }
-    //   }
-    //   // this.layoutSettings = JSON.parse(configData.data);
-    //   if (Object.keys(this.form.checked).length > 0) {
-    //     for (let k = 0; k < Object.keys(this.form.checked).length; k++) {
-    //       let newName = Object.keys(this.form.checked)[k]
-    //       let newFolderName = folderUrl + '/' + Object.keys(this.form.checked)[k];
-    //       axios.post(config.baseURL + '/flows-dir-listing', {
-    //           foldername: newFolderName,
-    //           type: 'folder'
-    //         })
-    //         .then((res) => {
-    //           this.newFolderDialog = false
-    //           this.addNewFolderLoading = false
-    //           let x = newName
-    //           this.addNewFileLoading = true
-    //           let newfilename = newFolderName + '/default.html'
-    //           axios.post(config.baseURL + '/flows-dir-listing', {
-    //               filename: newfilename,
-    //               text: ' ',
-    //               type: 'file'
-    //             })
-    //             .then((res) => {
-    //               this.newFileDialog = false
-    //               this.addNewFileLoading = false
-    //               this.formAddFile.filename = null
-    //               this.globalConfigData[2].layoutOptions[0][x] = [];
-    //               let temp1 = {
-    //                 value: "default",
-    //                 label: "default"
-    //               }
-    //               this.globalConfigData[2].layoutOptions[0][x].push(temp1)
-    //               this.saveConfigFile(folderUrl);
-    //               /****
-    //               updating function 
-    //               ***/
-    //               let totalPartial = content.match(/{{>/g).length;
-    //               let namefile = fileNameOrginal.split('.')[0];
-    //               let namefolder = foldername;
-    //               let temp = {
-    //                 value: namefile,
-    //                 label: namefile,
-    //                 partialsList: result,
-    //                 defaultList: DefaultParams
-    //               }
-    //               let checkValue = false;
-    //               for (var i = 0; i < Object.keys(this.globalConfigData[2].layoutOptions[0]).length; i++) {
-    //                 var obj = Object.keys(this.globalConfigData[2].layoutOptions[0])[i];
-    //                 if ((obj) == namefolder) {
-    //                   checkValue = true;
-    //                 }
-    //               }
-    //               if (checkValue == true) {
-    //                 let checkFileNamevalue = false;
-    //                 for (let j = 0; j < this.globalConfigData[2].layoutOptions[0][namefolder].length; j++) {
-    //                   if (this.globalConfigData[2].layoutOptions[0][namefolder][j].label == namefile) {
-    //                     checkFileNamevalue = true
-    //                     this.globalConfigData[2].layoutOptions[0][namefolder][j].partialsList = [];
-    //                     this.globalConfigData[2].layoutOptions[0][namefolder][j].defaultList = [];
-    //                     this.globalConfigData[2].layoutOptions[0][namefolder][j].partialsList = result;
-    //                     this.globalConfigData[2].layoutOptions[0][namefolder][j].defaultList = DefaultParams;
-    //                   }
-    //                 }
-    //                 if (checkFileNamevalue != true) {
-    //                   this.globalConfigData[2].layoutOptions[0][namefolder].push(temp)
-    //                 }
-    //                 this.saveConfigFile(folderUrl);
-    //               } else {
-    //                 this.saveConfigFile(folderUrl);
-    //               }
-    //             })
-    //             .catch((e) => {
-    //               console.log(e)
-    //             })
-    //             // this.globalConfigData[2].layoutOptions[0].push(result[i].trim())
-    //             // this.saveConfigFile(folderUrl);
-    //         })
-    //         .catch((e) => {
-    //           console.log(e)
-    //         })
-    //     }
-
-    //     this.form.checked = []
-    //     this.form.namearray = []
-    //   }
-    //   this.form.checked = []
-    //   this.form.namearray = []
-    // },
 
     dialogFormVisibleCancel() {
       this.form.namearray = []
@@ -3667,6 +2907,7 @@ export default {
 
               // Remove item from array
               this.globalConfigData[1].pageSettings.splice(indexOfPageName, 1);
+              this.globalConfigData[2].layoutOptions[0].Pages.splice(indexOfPageName, 1);
 
               // save config file
               this.saveConfigFile(folderUrl);
@@ -3743,29 +2984,30 @@ export default {
               this.saveConfigFile(folderUrl);
             } else {
               console.log('Other some file not in config.json');
-              // let partialsArray = [];
+              let partialsArray = [];
 
-              // partialsArray.push(Object.keys(this.globalConfigData[2].layoutOptions[0]));
+              partialsArray.push(Object.keys(this.globalConfigData[2].layoutOptions[0]));
 
-              // console.log('Partials Array:', partialsArray);
+              console.log('Partials Array:', partialsArray);
 
-              // for (var i = 0; i < partialsArray.length; i++){
-              //   var partialNameBreak = last_element.splice('.');
-              //   var partialNameOnly = partialNameBreak[0];
+              for (var i = 0; i < partialsArray.length; i++){
+                var partialNameBreak = last_element.replace('.html','');
+                var partialNameOnly = partialNameBreak;
+                console.log("last_element:",last_element)
+                var partialName=file_path_.split('\\')[file_path_.split('\\').length -2]
+                console.log('partialNameOnly:', partialNameOnly);
 
-              //   console.log('partialNameOnly:', partialNameOnly);
+                console.log('partialNameOnly data:', this.globalConfigData[2].layoutOptions[0][partialName]);
 
-              //   console.log('partialNameOnly data:', this.globalConfigData[2].layoutOptions[0][partialName]);
+                // get index of file to be deleted
+                let indexOfPartialName = _.findIndex(this.globalConfigData[2].layoutOptions[0][partialName], function(o) { return o.value == partialNameOnly; });
 
-              //   // get index of file to be deleted
-              //   let indexOfPartialName = _.findIndex(this.globalConfigData[2].layoutOptions[0][partialName], function(o) { return o.value == partialNameOnly; });
+                // Remove item from array
+                this.globalConfigData[2].layoutOptions[0][partialName].splice(indexOfPartialName, 1);
 
-              //   // Remove item from array
-              //   this.globalConfigData[2].layoutOptions[0][partialName].splice(indexOfPartialName, 1);
-
-              //   // save config file
-              //   this.saveConfigFile(folderUrl);
-              // }
+                // save config file
+                this.saveConfigFile(folderUrl);
+              }
             }
 
           })
@@ -3829,6 +3071,7 @@ export default {
         console.log('error', dismiss)
       })
     },
+
 
     // If clicked the root folder
     goToHomePage () {

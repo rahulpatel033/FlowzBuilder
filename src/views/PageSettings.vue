@@ -19,57 +19,6 @@
               </el-select>
             </el-form-item>
 
-            <!-- <el-form-item label="Page Header">
-              <el-row>
-                <el-col :span="10">
-                  <el-select v-model="form.Header" placeholder="Please select Header">
-                    <el-option
-                      v-for="item in form.headers"
-                      :key="item.value"
-                      :label="item.label"
-                      :value="item.value">
-                    </el-option>
-                  </el-select>
-                </el-col>
-                <el-col :span="14">
-                  <el-form-item label="Page Footer">
-                    <el-select v-model="form.Footer" placeholder="Please select Footer">
-                      <el-option
-                        v-for="item in form.footers"
-                        :key="item.value"
-                        :label="item.label"
-                        :value="item.value">
-                      </el-option>
-                    </el-select>
-                  </el-form-item>
-                </el-col>
-              </el-row>
-            </el-form-item>
-
-            <el-form-item label="Page Sidebar">
-              <el-select v-model="form.Sidebar" placeholder="Please select Sidebar">
-                <el-option
-                  v-for="item in form.sidebars"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value">
-                </el-option>
-              </el-select>
-                
-            </el-form-item>
-
-            <el-form-item label="Page Menu">
-              <el-select v-model="form.Menu" placeholder="Please select Menu">
-                <el-option
-                  v-for="item in form.menus"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value">
-                </el-option>
-              </el-select>
-                
-            </el-form-item> -->
-
             <div id="demo">
               <div v-for='(n,index) in partialsList'>
                  <el-form-item :label="n ">
@@ -84,6 +33,19 @@
                  </el-form-item>
               </div>
             </div>
+             <!-- <el-form-item label="Page Url Type">
+               <el-select v-model="value10"  filterable="" allow-create placeholder="Choose tags for your article">
+                <el-option v-for="item in options5" :key="item.value" :label="item.label" :value="item.value">
+                </el-option>
+              </el-select>
+            </el-form-item> -->
+
+            <!-- <el-form-item label="Page Pattern">
+              <el-input v-model="form.urlpattern"></el-input>
+            </el-form-item> --> 
+            <el-form-item label="Page Url value">
+              <el-input v-model="form.url"></el-input>
+            </el-form-item> 
 
             <el-form-item label="Page SEO Title">
               <el-input v-model="form.seoTitle"></el-input>
@@ -128,8 +90,18 @@ export default {
   },
   data () {
     return {
+       options5: [{
+          value: 'Date',
+          label: 'Date'
+        }, {
+          value: 'title',
+          label: 'Title'
+        }],
+        value10: [],
       form: {
         name: '',
+        url: '',
+        urlpattern: '',
         nameSecond:'',
         seoTitle: '',
         seoKeywords: '',
@@ -231,108 +203,7 @@ export default {
                }
            }
        }
-
-       // for(let x=0;x<this.AllData.length;x++){
-       //  var checkingValue=false
-       //  for(let y=0;y<this.defaultParams.length;y++){
-
-       //    if(Object.keys(this.defaultParams[y])[0]==this.partialsList[x]){
-       //      checkingValue=true
-            
-       //  }
-
-       //  }
-       //  if(checkingValue!=true){
-
-       //  this.form.parent_id[this.partialsList[x]]=this.AllData[x][0]
-       //  }
-
-       // }
-       
-
     },
-
-    // async layoutChange(){
-    //   let url = this.$store.state.fileUrl.replace(/\\/g, "\/");
-    //   let urlparts = url.split("/");
-    //   let fileNameOrginal = urlparts[urlparts.length - 1];
-    //   let fileName = '/' + urlparts[urlparts.length - 2] + '/' + urlparts[urlparts.length - 1];
-    //   this.folderUrl = url.replace(fileName, '');
-    //   console.log("change layout triggered");
-    //   for (var i = 0; i < this.form.layouts.length; i++) {
-    //     if (this.form.layouts[i].label === this.form.Layout) {
-    //       let variable = this.form.layouts[i].partialsList;
-    //       this.partialsList = variable;
-    //       this.defaultParams = this.form.layouts[i].defaultList;
-    //     }
-    //   }
-    //   console.log("partials:", this.partialsList)
-
-    //   console.log("defaultList:", this.defaultParams)
-
-    //   for (i = 0; i < this.partialsList.length; i++) {
-    //     console.log("i:", this.partialsList[i])
-    //   }
-
-    //   this.configData = await axios.get(config.baseURL + '/flows-dir-listing/0?path=' + this.folderUrl + '/assets/config.json');
-    //   this.AllData = [];
-    //   if (this.configData.status == 200 || this.configData.status == 204) {
-    //     console.log("@@@@@@@@@@@@@")
-    //     this.settings = JSON.parse(this.configData.data);
-
-    //     for (var i = 0; i < this.partialsList.length; i++) {
-
-    //       var nameP = this.partialsList[i];
-    //       console.log("nameP:", nameP)
-    //       if (this.settings[2].layoutOptions[0][nameP]) {
-
-    //         let change = false;
-    //         for (var j = 0; j < this.defaultParams.length; j++) {
-    //           if (Object.keys(this.defaultParams[j])[0] == nameP) {
-    //             console.log("default value found ");
-    //             this.AllData[i] = this.settings[2].layoutOptions[0][nameP]
-    //             let tp = this.defaultParams[j][nameP].split('.')
-    //             console.log("tp:", tp)
-    //             if (tp[1] == 'hbs') {
-    //               for (let k = 0; k < (this.AllData[i]).length; k++) {
-    //                 console.log("this.AllData[i][k].value:", (this.AllData[i][k].value).split('.')[0])
-
-    //                 if ((this.AllData[i][k].value).split('.')[0] == tp[0])
-    //                   this.form.parent_id[nameP] = this.AllData[i][k]
-    //               }
-    //             } else {
-
-    //               this.form.parent_id[nameP] = tp[0]
-    //             }
-    //             console.log("parent_id:", this.form.parent_id)
-
-    //             for (let k = 0; k < Object.keys(this.AllData[i]).length; k++) {
-    //               console.log("i of AllData:", this.AllData[i][k])
-    //               this.AllData[i][k]['disabled'] = true;
-    //             }
-
-    //             change = true
-    //           }
-    //         }
-    //         if (change != true) {
-    //           this.AllData[i] = this.settings[2].layoutOptions[0][nameP]
-    //           if (this.AllData[i].length == 1) {
-    //             this.form.parent_id[nameP] = this.AllData[i][0]
-    //           }
-    //           console.log("not found default , data of ", nameP, ":", this.AllData[i]);
-    //           change = false;
-    //         }
-    //       } else {
-    //         console.log("partials not found in config file.")
-    //       }
-    //     }
-    //   }
-    //   console.log("AllData:", this.AllData)
-    //   console.log("partials:", this.partialsList);
-    // },
-
-
-
     async savePageSettings() {
       let url = this.$store.state.fileUrl.replace(/\\/g, "\/");
       let urlparts = url.split("/");
@@ -360,12 +231,15 @@ export default {
           "PageSEOTitle": this.form.seoTitle,
           "PageSEOKeywords": this.form.seoKeywords,
           "PageSEODescription": this.form.seoDesc,
+          "PageURL": this.form.url, 
           "PageLayout": this.form.Layout,
           "partials": []
       };
       if (this.currentFileIndex != null) {
           this.settings[1].pageSettings[this.currentFileIndex].partials = [];
           this.settings[1].pageSettings[this.currentFileIndex].PageLayout = this.form.Layout;
+          this.settings[1].pageSettings[this.currentFileIndex].PageURL=this.form.url; 
+
 
           for (let j = 0; j < Object.keys(this.form.parent_id).length; j++) {
             if (this.form.parent_id[Object.keys(this.form.parent_id)[j]].partialsList != undefined) {
@@ -483,178 +357,60 @@ export default {
               });
           })
         }
+        }
+    },
+    async created () {
+        let url = this.$store.state.fileUrl.replace(/\\/g, "\/");
+        let urlparts = url.split("/");
+        let fileNameOrginal = urlparts[urlparts.length-1];
+        let fileName = '/' + urlparts[urlparts.length-2] + '/' + urlparts[urlparts.length-1];
+        this.folderUrl = url.replace(fileName, '');
+
+        this.configData = await axios.get( config.baseURL + '/flows-dir-listing/0?path=' + this.folderUrl + '/assets/config.json');
+        if(this.configData.status == 200 || this.configData.status == 204){
+          this.settings = JSON.parse(this.configData.data);
+          
+          // Get Current file index
+          this.currentFileIndex = daex.indexFirst(this.settings[1].pageSettings,{'PageName':fileNameOrginal});
+
+          this.form.name = fileNameOrginal;
+          this.form.layouts = this.settings[2].layoutOptions[0].Layout;
+
+          
+          if('PageSEOTitle' in this.settings[1].pageSettings[this.currentFileIndex]){
+            this.form.seoTitle = this.settings[1].pageSettings[this.currentFileIndex].PageSEOTitle;
+          } else {
+            this.form.seoTitle = '';
+          }
+
+          if('PageSEOKeywords' in this.settings[1].pageSettings[this.currentFileIndex]){
+            this.form.seoKeywords = this.settings[1].pageSettings[this.currentFileIndex].PageSEOKeywords;
+          } else {
+            this.form.seoKeywords = '';
+          }
+
+          if('PageSEODescription' in this.settings[1].pageSettings[this.currentFileIndex]){
+            this.form.seoDesc = this.settings[1].pageSettings[this.currentFileIndex].PageSEODescription;
+          } else {
+            this.form.seoDesc = '';
+          }
+
+          if('PageLayout' in this.settings[1].pageSettings[this.currentFileIndex]){
+            console.log('Layout Found in config', this.settings[1].pageSettings[this.currentFileIndex].PageLayout)
+            this.form.Layout = this.settings[1].pageSettings[this.currentFileIndex].PageLayout;
+            this.form.url=this.settings[1].pageSettings[this.currentFileIndex].PageURL
+          } else {
+            this.form.Layout = '';
+            this.form.url='';
+          }
+
+        } else {
+          console.log('Cannot get config file!');
+        }   
+    },
+    mounted () {
+
     }
-
-    // Befor auto Folder metal smith 26-Oct Before Demo
-    // async savePageSettings() {
-
-    //   let url = this.$store.state.fileUrl.replace(/\\/g, "\/");
-    //   let urlparts = url.split("/");
-    //   let fileNameOrginal = urlparts[urlparts.length - 1];
-    //   let fileName = '/' + urlparts[urlparts.length - 2] + '/' + urlparts[urlparts.length - 1];
-    //   this.folderUrl = url.replace(fileName, '');
-
-    //   this.Data = await axios.get(config.baseURL + '/flows-dir-listing/0?path=' + this.folderUrl + '/assets/config.json');
-    //   if (this.Data.status == 200 || this.Data.status == 204) {
-          
-    //     this.settingsData = JSON.parse(this.Data.data);
-    //     this.currentIndex = daex.indexFirst(this.settingsData[1].pageSettings, {
-    //         'PageName': fileNameOrginal
-    //     });
-    //     this.form.nameSecond = fileNameOrginal;
-    //     this.form.secondlayouts = this.settingsData[2].layoutOptions[0].Layout;
-          
-    //   } else {
-    //       console.log('Cannot get config file!');
-    //   }
-
-    //   for (var i = 0; i < this.form.secondlayouts.length; i++) {
-    //     if (this.form.secondlayouts[i].label === this.form.Layout) {
-    //         this.partialsListSelection = this.form.secondlayouts[i].partialsList;
-    //     }
-    //   }
-
-    //   var PageSettings = {
-    //     "PageName": this.form.name,
-    //     "PageSEOTitle": this.form.seoTitle,
-    //     "PageSEOKeywords": this.form.seoKeywords,
-    //     "PageSEODescription": this.form.seoDesc,
-    //     "PageLayout": this.form.Layout,
-    //     "partials": []
-    //   };
-
-    //   if (this.currentFileIndex != null) {
-
-    //     this.settings[1].pageSettings[this.currentFileIndex].partials = [];
-    //     this.settings[1].pageSettings[this.currentFileIndex].PageLayout = this.form.Layout;
-
-    //     for (var i = 0; i < this.partialsListSelection.length; i++) {
-    //         let temp = this.partialsListSelection[i]
-    //         var obj = {};
-
-    //         let change = false;
-    //         if (change != true) {
-    //             obj[temp] = this.form.parent_id[temp];
-    //             change = false;
-    //         }
-
-    //         this.settings[1].pageSettings[this.currentFileIndex].partials.push(obj);
-    //     }
-
-
-    //     let newfilename = this.folderUrl + '/assets/config.json';
-    //     axios.post(config.baseURL + '/flows-dir-listing', {
-    //         filename: newfilename,
-    //         text: JSON.stringify(this.settings),
-    //         type: 'file'
-    //     })
-    //     .then((res) => {
-
-    //         this.$message({
-    //             showClose: true,
-    //             message: 'Config Saved!',
-    //             type: 'success'
-    //         });
-
-    //     })
-    //     .catch((e) => {
-    //         console.log(e);
-    //         this.$message({
-    //             showClose: true,
-    //             message: 'Cannot save config file! Some error occured, try again.',
-    //             type: 'error'
-    //         });
-    //     })
-
-    //   } else {
-    //     for (var i = 0; i < this.partialsListSelection.length; i++) {
-    //         let temp = this.partialsListSelection[i]
-    //         var obj = {};
-
-    //         obj[temp] = this.form.parent_id[temp];
-    //         PageSettings.partials.push(obj)
-
-    //     }
-
-    //     this.settings[1].pageSettings.push(PageSettings);
-
-    //     let newfilename = this.folderUrl + '/assets/config.json';
-    //     axios.post(config.baseURL + '/flows-dir-listing', {
-    //         filename: newfilename,
-    //         text: JSON.stringify(this.settings),
-    //         type: 'file'
-    //     })
-    //     .then((res) => {
-
-    //         this.$message({
-    //             showClose: true,
-    //             message: 'Config Saved!',
-    //             type: 'success'
-    //         });
-
-    //     })
-    //     .catch((e) => {
-    //         console.log(e);
-    //         this.$message({
-    //             showClose: true,
-    //             message: 'Cannot save file! Some error occured, try again.',
-    //             type: 'error'
-    //         });
-    //     })
-    //   }
-    // }
-
-  },
-  async created () {
-
-    let url = this.$store.state.fileUrl.replace(/\\/g, "\/");
-    let urlparts = url.split("/");
-    let fileNameOrginal = urlparts[urlparts.length-1];
-    let fileName = '/' + urlparts[urlparts.length-2] + '/' + urlparts[urlparts.length-1];
-    this.folderUrl = url.replace(fileName, '');
-
-    this.configData = await axios.get( config.baseURL + '/flows-dir-listing/0?path=' + this.folderUrl + '/assets/config.json');
-    if(this.configData.status == 200 || this.configData.status == 204){
-      this.settings = JSON.parse(this.configData.data);
-      
-      // Get Current file index
-      this.currentFileIndex = daex.indexFirst(this.settings[1].pageSettings,{'PageName':fileNameOrginal});
-
-      this.form.name = fileNameOrginal;
-      this.form.layouts = this.settings[2].layoutOptions[0].Layout;
-      
-      if('PageSEOTitle' in this.settings[1].pageSettings[this.currentFileIndex]){
-        this.form.seoTitle = this.settings[1].pageSettings[this.currentFileIndex].PageSEOTitle;
-      } else {
-        this.form.seoTitle = '';
-      }
-
-      if('PageSEOKeywords' in this.settings[1].pageSettings[this.currentFileIndex]){
-        this.form.seoKeywords = this.settings[1].pageSettings[this.currentFileIndex].PageSEOKeywords;
-      } else {
-        this.form.seoKeywords = '';
-      }
-
-      if('PageSEODescription' in this.settings[1].pageSettings[this.currentFileIndex]){
-        this.form.seoDesc = this.settings[1].pageSettings[this.currentFileIndex].PageSEODescription;
-      } else {
-        this.form.seoDesc = '';
-      }
-
-      if('PageLayout' in this.settings[1].pageSettings[this.currentFileIndex]){
-        console.log('Layout Found in config', this.settings[1].pageSettings[this.currentFileIndex].PageLayout)
-        this.form.Layout = this.settings[1].pageSettings[this.currentFileIndex].PageLayout;
-      } else {
-        this.form.Layout = '';
-      }
-
-    } else {
-      console.log('Cannot get config file!');
-    }   
-  },
-  mounted () {
-
-  }
 }
 </script>
 
