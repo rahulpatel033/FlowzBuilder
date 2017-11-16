@@ -605,6 +605,15 @@ export default {
                         })
                         .then(async (res) => {
                             // console.log("preview folder created:")
+                            if(Layout=='Blank'){
+                              await axios.post(config.baseURL + '/flows-dir-listing', {
+                              filename: folderUrl+'/Layout/Blank.layout',
+                              type: 'file'
+                              })
+                              .catch((e)=>{
+                                console.log("error while blank file creation")
+                              })
+                            }
                             var layoutdata = await axios.get(config.baseURL + '/flows-dir-listing/0?path=' + folderUrl + '/Layout/' + Layout + '.layout');
                              var rawContent = await axios.get(config.baseURL + '/flows-dir-listing/0?path=' + folderUrl + '/Pages/' + nameF + '.html');
                              rawContent=rawContent.data
@@ -699,8 +708,14 @@ export default {
                                                                             text: layoutdata.data,
                                                                             type: 'file'
                                                                         })
-                                                                        .then((res) => {
+                                                                        .then(async (res) => {
                                                                             console.log("layout file reset")
+                                                                            if(Layout=='Blank'){
+                                                                          await axios.delete(config.baseURL + '/flows-dir-listing/0?filename=' + folderUrl + '/Layout/Blank.layout')
+                                                                          .catch((e)=>{
+                                                                            console.log("error while deleting blank.layout file")
+                                                                          })
+                                                                        }
 
                                                                         })
                                                                         .catch((e) => {
