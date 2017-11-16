@@ -1072,8 +1072,8 @@ export default {
         var index = responseMetal.data.search('.source')
 
         responseMetal.data = responseMetal.data.substr(0, index + 9) + folderUrl + '/Preview' + responseMetal.data.substr(index + 9)
-
-        if (this.form.url != '') {
+        console.log("this.form.url:",this.form.url)
+        if (this.form.url != ''|| this.form.url != undefined) {
             var indexPerma = responseMetal.data.search('.clean');
             var permalinks = "\n.use(permalinks({ pattern: ':date' }))"
             responseMetal.data = responseMetal.data.substr(0, indexPerma + 13) + permalinks + responseMetal.data.substr(indexPerma + 13)
@@ -1115,7 +1115,6 @@ export default {
                     message: 'Config Saved!',
                     type: 'success'
                 });
-
                 // Create temporary preview folder
                 let newFolderName = folderUrl + '/Preview';
                 return axios.post(config.baseURL + '/flows-dir-listing', {
@@ -1124,10 +1123,11 @@ export default {
                         type: 'folder'
                     })
                     .then(async (res) => {
-                        console.log(res)
+                        // console.log(res)
                         // Create preview file
-
+                        console.log("this.form.Layout:",this.form.Layout)
                         if(this.form.Layout=='Blank'){
+                          console.lo("inside blank layout condition:")
                           await axios.post(config.baseURL + '/flows-dir-listing', {
                           filename: folderUrl+'/Layout/Blank.layout',
                           type: 'file'
@@ -1173,26 +1173,32 @@ export default {
                                 type: 'file'
                             })
                             .then(async (res) => {
-                                console.log("successfully layout file edited:")
+                                // console.log("successfully layout file edited:")
                                 let rawContent = this.$store.state.content;
                                 if (this.form.Layout == 'Blank') {
-                                  let substr = rawContent.substr(rawContent.search('---'), rawContent.search('<'))
-                                    if (this.form.url != '') {
-
+                                  console.log("in blank and url==''")
+                                  // let substr = rawContent.substr(rawContent.search('---'), rawContent.search('<'))
+                                    if (this.form.url != undefined) {
+                                      console.log("in blank and url !=''")
                                         console.log("here")
                                         rawContent = "---\ndate: " + this.form.url + "\n---" + rawContent
                                     } else {
+                                      console.log("in blank and url==''")
                                         rawContent = rawContent
                                     }
                                 } else {
-                                  if (this.form.url != '') {
+                                  if (this.form.url != undefined) {
+                                    console.log("in not blank and url=!''")
                                       let tempValueLayout = '---\ndate: ' + this.form.url + '\nlayout: ' + this.form.Layout + '.layout\n---\n';
+                                      rawContent = tempValueLayout + rawContent
                                   } else {
+                                    console.log("in not blank and url==''")
                                       let tempValueLayout = '---\nlayout: ' + this.form.Layout + '.layout\n---\n';
                                           rawContent = tempValueLayout + rawContent
 
                                   }
                                 }
+                                console.log("rawContent:",rawContent)
                                 // if (this.form.Layout == 'Blank') {
                                 //     if (rawContent.match('---')) {
                                 //         let substr = rawContent.substr(rawContent.search('---'), rawContent.search('<'))
