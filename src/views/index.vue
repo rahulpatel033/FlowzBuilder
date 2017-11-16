@@ -10,8 +10,8 @@
 
       <span slot="footer" class="dialog-footer">
         <el-button @click="dialogFormVisible = false, dialogFormVisibleCancel()">Cancel</el-button>
-        <el-button v-if='dialogvalue==false' disabled type="primary" @click="dialogFormVisible = false, dialogFormVisibleAdd()">Add</el-button>
-        <el-button v-if='dialogvalue==true'  type="primary" @click="dialogFormVisible = false, dialogFormVisibleAdd()">Add</el-button>
+        <el-button v-if='dialogvalue==false' disabled>Add</el-button>
+        <el-button v-if='dialogvalue==true' type="primary" @click="dialogFormVisible = false, dialogFormVisibleAdd()">Add</el-button>
       </span>
     </el-dialog>
 
@@ -2802,9 +2802,9 @@ export default {
           }
       }
       console.log("DefaultParams:",DefaultParams)
-      
-      for(let z=0;z<Object.keys(this.form.checked).length;z++){   
-        if (this.form.checked[Object.keys(this.form.checked)]==true) {
+      console.log("Object.keys(this.form.checked).length:",Object.keys(this.form.checked).length)
+      for(let z=0;z<Object.keys(this.form.checked).length;z++){
+        if (this.form.checked[Object.keys(this.form.checked)[z]]==true) {
           for (let k = 0; k < result.length; k++) {
             let ch = false
             for (let r = 0; r < DefaultParams.length; r++) {
@@ -2812,7 +2812,22 @@ export default {
                 ch = true
               }
             }
-            if (ch == false) {
+            if (result[k]==Object.keys(this.form.checked)[z] && ch == false) {
+              let self = this;
+              setTimeout(function() {
+                self.$notify({
+                  title: 'AutoSet',
+                  message: result[k] + " id='default.html'",
+                  type: 'success'
+                });
+              }, 100);
+
+              let obj = {}
+              obj[result[k]] = 'default.html'
+              DefaultParams.push(obj)
+
+            }
+            else if (result[k]!=Object.keys(this.form.checked)[z] && ch == false) {
               let self = this;
               setTimeout(function() {
                 self.$notify({
@@ -2914,6 +2929,7 @@ export default {
 
     dialogFormVisibleCancel() {
       this.form.namearray = []
+      this.dialogvalue=true
     },
 
     // Save Page settings (Not in use)
